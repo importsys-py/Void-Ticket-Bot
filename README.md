@@ -1,4 +1,4 @@
-# Ticket-Bot
+# Void-Ticket-Bot
 
 A powerful, customizable Discord bot for handling support tickets using buttons, modals, and private channels.  
 Designed for Discord communities that need a robust ticketing/helpdesk system with role-based permissions, logging, and a user-friendly interface.
