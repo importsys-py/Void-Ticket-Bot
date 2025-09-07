@@ -95,6 +95,32 @@ Designed for Discord communities that need a robust ticketing/helpdesk system wi
 
 ---
 
+## Important: Setting Up Role and Channel IDs
+
+**You must set your own role and channel IDs in the code for the bot to work properly.**  
+The current code uses empty `get_role()` and `get_channel()` calls, which will always return `None` unless you provide the correct IDs.
+
+### Where to Set IDs
+
+- **In `src/main.py` and `src/classes.py`:**  
+  - Replace all `get_role()` and `get_channel()` calls with your actual role and channel IDs.
+  - Example:  
+    ```python
+    role = interaction.guild.get_role(123456789012345678)  # Your staff role ID
+    channel = bot.get_channel(123456789012345678)         # Your setup/log channel ID
+    ```
+
+- **For categories:**  
+  - Update the `category` lists in the commands to include your ticket category IDs.
+
+### How to Get IDs
+
+1. Enable Developer Mode in Discord (User Settings > Advanced > Developer Mode).
+2. Right-click on the role/channel/category you want to use and select "Copy ID".
+3. Paste the ID into the code where needed.
+
+---
+
 ## File Structure
 
 - `src/main.py` — Main bot logic, event handlers, and command registration.
