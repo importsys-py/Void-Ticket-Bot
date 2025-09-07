@@ -1,0 +1,7 @@
+discord
+asyncio
+colorama
+pytz
+bs4
+chat_exporter
+dotenv

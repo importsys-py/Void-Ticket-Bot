@@ -1,3 +1,8 @@
+"""
+THIS FILE CONTAINS ALL THE CLASSES, VIEWS, AND MODALS USED BY THE DISCORD TICKET BOT.
+EACH CLASS ENCAPSULATES A SPECIFIC PART OF THE TICKETING SYSTEM, SUCH AS UI COMPONENTS, MODAL DIALOGS, AND TICKET MANAGEMENT LOGIC.
+THE CLASSES HERE ARE DESIGNED TO BE USED AS PART OF THE DISCORD UI AND EVENT SYSTEM, AND INTERACT WITH THE DATABASE AND DISCORD API.
+"""
 import discord
 import asyncio
 import base64
@@ -15,12 +20,28 @@ from config import bot_user_avatar_url, bot_user_name
 # ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
 class CloseTicketButton(ui.Button):
+    """
+    A DISCORD UI BUTTON THAT ALLOWS AUTHORIZED USERS TO CLOSE A TICKET CHANNEL.
+    
+    THIS BUTTON IS ADDED TO THE TICKET EMBED MESSAGE. WHEN CLICKED, IT CHECKS IF THE USER HAS THE REQUIRED ROLE TO CLOSE TICKETS.
+    IF AUTHORIZED, IT OPENS A MODAL DIALOG TO COLLECT THE REASON FOR CLOSING THE TICKET. OTHERWISE, IT SENDS AN ERROR MESSAGE.
+    THE BUTTON IS STYLED AS A RED 'DANGER' BUTTON WITH A LOCK EMOJI TO CLEARLY INDICATE ITS PURPOSE.
+    
+    ATTRIBUTES:
+        TICKET_OWNER: THE USER WHO OPENED THE TICKET (CAN BE A USER ID OR OBJECT, DEPENDING ON CONTEXT).
+        OPENING_TIME: THE TIMESTAMP WHEN THE TICKET WAS CREATED, USED FOR LOGGING AND TRANSCRIPT PURPOSES.
+    
+    USAGE:
+        ADD THIS BUTTON TO A DISCORD.UI.VIEW AND SEND IT WITH A MESSAGE IN THE TICKET CHANNEL.
+    """
     def __init__(self, ticket_owner, opening_time):
-        
         """
-        label = THE TEXT THAT WILL APPEAR ON THE BUTTON
-        emoji = THE EMOJI THAT WILL APPEAR ON THE BUTTON
-        style = THE COLOR OF THE BUTTON
+        INITIALIZE THE CLOSETICKETBUTTON WITH THE TICKET OWNER AND OPENING TIME.
+        SETS UP THE BUTTON'S LABEL, EMOJI, AND STYLE FOR DISCORD UI.
+        
+        ARGS:
+            TICKET_OWNER: THE USER WHO OWNS THE TICKET (ID OR OBJECT).
+            OPENING_TIME: THE DATETIME STRING WHEN THE TICKET WAS OPENED.
         """
         super().__init__(
             label="Close Ticket",
@@ -31,6 +52,19 @@ class CloseTicketButton(ui.Button):
         self.opening_time = opening_time
 
     async def callback(self, interaction: discord.Interaction):
+        """
+        HANDLES THE BUTTON CLICK EVENT.
+        
+        CHECKS IF THE USER WHO CLICKED HAS THE REQUIRED ROLE TO CLOSE TICKETS. IF NOT, SENDS AN EPHEMERAL ERROR MESSAGE.
+        IF AUTHORIZED, OPENS A MODAL DIALOG (CLOSETICKETBUTTONMODAL) TO COLLECT THE REASON FOR CLOSING THE TICKET.
+        CLOSES THE DATABASE CONNECTION AFTER THE CHECK.
+        
+        ARGS:
+            INTERACTION: THE DISCORD INTERACTION OBJECT REPRESENTING THE BUTTON CLICK EVENT.
+        
+        SIDE EFFECTS:
+            MAY SEND ERROR MESSAGES, OPEN A MODAL, OR DO NOTHING IF UNAUTHORIZED.
+        """
         conn = sqlite3.connect("data/database/ticket.db")
         c = conn.cursor()
 
@@ -46,7 +80,7 @@ class CloseTicketButton(ui.Button):
         role2 = interaction.guild.get_role(ID_2)
         if not any(role in interaction.user.roles for role in [role1, role2]):
         """
-        role = interaction.guild.get_role(1409223615848906842) 
+        role = interaction.guild.get_role() 
         opening_time = interaction.channel.created_at.strftime("%d/%m/%Y %H:%M:%S")
 
         if role not in interaction.user.roles:
@@ -62,7 +96,25 @@ class CloseTicketButton(ui.Button):
 # ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
 class DropdownView(ui.View):
+    """
+    A DISCORD UI VIEW CONTAINING A DROPDOWN MENU FOR TICKET TYPE SELECTION.
+    
+    THIS VIEW IS USED TO LET USERS CHOOSE THE TYPE OF TICKET THEY WANT TO OPEN (E.G., ASSISTANCE, SUPPORT, ETC.).
+    EACH DROPDOWN OPTION IS MAPPED TO A SPECIFIC CATEGORY ID, WHICH DETERMINES WHERE THE TICKET CHANNEL WILL BE CREATED.
+    THE VIEW IS PERSISTENT (TIMEOUT=NONE) SO IT REMAINS ACTIVE UNTIL MANUALLY REMOVED.
+    
+    ATTRIBUTES:
+        CATEGORY_IDS: A DICTIONARY MAPPING DROPDOWN VALUES TO DISCORD CATEGORY IDS.
+    
+    USAGE:
+        SEND THIS VIEW WITH A MESSAGE IN THE SETUP CHANNEL TO ALLOW USERS TO OPEN TICKETS.
+    """
     def __init__(self):
+        """
+        INITIALIZES THE DROPDOWNVIEW WITH PREDEFINED TICKET CATEGORIES AND OPTIONS.
+        SETS UP THE DROPDOWN MENU WITH PLACEHOLDER TEXT AND AVAILABLE OPTIONS.
+        THE CALLBACK FOR THE DROPDOWN IS SET TO HANDLE USER SELECTIONS.
+        """
         super().__init__(timeout=None)
 
         """
@@ -91,6 +143,18 @@ class DropdownView(ui.View):
         self.add_item(select)
 
     async def select_callback(self, interaction: discord.Interaction):
+        """
+        HANDLES THE EVENT WHEN A USER SELECTS AN OPTION FROM THE DROPDOWN MENU.
+        
+        DEPENDING ON THE SELECTED VALUE, OPENS THE CORRESPONDING MODAL DIALOG (E.G., ASSISTANCE MODAL).
+        IF THE VALUE IS INVALID OR AN ERROR OCCURS, SENDS AN EPHEMERAL ERROR MESSAGE TO THE USER.
+        
+        ARGS:
+            INTERACTION: THE DISCORD INTERACTION OBJECT REPRESENTING THE DROPDOWN SELECTION EVENT.
+        
+        SIDE EFFECTS:
+            MAY OPEN A MODAL, SEND ERROR MESSAGES, OR DO NOTHING IF THE SELECTION IS INVALID.
+        """
         selected_value = interaction.data["values"][0]
         category_id = self.category_ids.get(selected_value)
 
@@ -111,7 +175,29 @@ class DropdownView(ui.View):
 # ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
 class Assistance(ui.Modal, title="🚨 | Ticket Assistance (Part: Modal)"):
+    """
+    A DISCORD MODAL DIALOG FOR COLLECTING INFORMATION FROM USERS WHO WANT TO OPEN A NEW TICKET.
+    
+    THIS MODAL ASKS THE USER FOR THEIR NICKNAME AND A DESCRIPTION OF THEIR PROBLEM. WHEN SUBMITTED, IT CHECKS IF THE USER ALREADY HAS AN OPEN TICKET.
+    IF NOT, IT CREATES A NEW TICKET CHANNEL IN THE APPROPRIATE CATEGORY, SETS PERMISSIONS, SAVES TICKET DATA TO THE DATABASE, AND SENDS A WELCOME EMBED.
+    ALSO ADDS A CLOSETICKETBUTTON TO THE NEW TICKET CHANNEL FOR FUTURE CLOSURE.
+    
+    ATTRIBUTES:
+        CATEGORY_ID: THE DISCORD CATEGORY ID WHERE THE TICKET CHANNEL WILL BE CREATED.
+        OPENING_TIME: THE TIMESTAMP WHEN THE MODAL WAS OPENED (FOR LOGGING/TRANSCRIPT).
+        TICKET_OWNER: THE USER WHO IS OPENING THE TICKET (SET ON SUBMIT).
+    
+    USAGE:
+        INSTANTIATED AND SHOWN TO THE USER WHEN THEY SELECT A TICKET TYPE FROM THE DROPDOWN.
+    """
     def __init__(self, category_id):
+        """
+        INITIALIZES THE ASSISTANCE MODAL WITH INPUT FIELDS FOR NICKNAME AND PROBLEM DESCRIPTION.
+        SETS THE CATEGORY WHERE THE TICKET WILL BE CREATED.
+        
+        ARGS:
+            CATEGORY_ID: THE DISCORD CATEGORY ID FOR THE NEW TICKET CHANNEL.
+        """
         super().__init__(timeout=None)
         self.category_id = category_id
         self.opening_time = datetime.now(pytz.timezone("Europe/Rome")).strftime("%d/%m/%Y %H:%M:%S (DD/MM/YYYY Italian Timezone)")
@@ -121,6 +207,19 @@ class Assistance(ui.Modal, title="🚨 | Ticket Assistance (Part: Modal)"):
         self.add_item(ui.TextInput(label="What's your problem?", placeholder="Describe your problem", style=discord.TextStyle.paragraph))
         
     async def on_submit(self, interaction: discord.Interaction):
+        """
+        HANDLES THE EVENT WHEN THE USER SUBMITS THE ASSISTANCE MODAL.
+        
+        CHECKS IF THE USER ALREADY HAS AN OPEN TICKET (BOTH IN THE DATABASE AND ON THE SERVER).
+        IF NOT, CREATES A NEW TICKET CHANNEL, SETS PERMISSIONS, SAVES TICKET INFO TO THE DATABASE, AND SENDS A WELCOME EMBED AND CLOSE BUTTON.
+        PINS THE WELCOME MESSAGE FOR VISIBILITY. HANDLES EDGE CASES WHERE THE TICKET EXISTS IN THE DB BUT NOT ON THE SERVER.
+        
+        ARGS:
+            INTERACTION: THE DISCORD INTERACTION OBJECT REPRESENTING THE MODAL SUBMISSION.
+        
+        SIDE EFFECTS:
+            MAY CREATE CHANNELS, SEND MESSAGES, UPDATE THE DATABASE, AND PIN MESSAGES.
+        """
         await interaction.response.defer(ephemeral=True)
 
         conn = sqlite3.connect("data/database/ticket.db")
@@ -129,7 +228,7 @@ class Assistance(ui.Modal, title="🚨 | Ticket Assistance (Part: Modal)"):
         self.ticket_owner = interaction.user
         nickname = self.children[0].value # The first answer from the modal
         description = self.children[1].value # The second answer from the modal
-        role = interaction.guild.get_role(1409223615848906842) # The role that can see the ticket
+        role = interaction.guild.get_role() # The role that can see the ticket
         category = discord.utils.get(interaction.guild.categories, id=self.category_id) # Do not change this
 
         """
@@ -145,10 +244,10 @@ class Assistance(ui.Modal, title="🚨 | Ticket Assistance (Part: Modal)"):
             ticket_channel = discord.utils.get(interaction.guild.text_channels, name=ticket_name)
 
             if ticket_channel:
-                await interaction.followup.send(f'<:warning:1409269746477695078> You already have an open ticket: {ticket_channel.mention}', ephemeral=True)
+                await interaction.followup.send(f'You already have an open ticket: {ticket_channel.mention}', ephemeral=True)
                 return
             else:
-                await interaction.followup.send(f'<:warning:1409269746477695078> You already have an open ticket named **{ticket_name}**, but the channel was not found. Please contact the staff.', ephemeral=True)
+                await interaction.followup.send(f'You already have an open ticket named **{ticket_name}**, but the channel was not found. Please contact the staff.', ephemeral=True)
                 return
         
         """
@@ -184,9 +283,9 @@ class Assistance(ui.Modal, title="🚨 | Ticket Assistance (Part: Modal)"):
         message = await ticket_channel.send(embed=emb)
 
         if interaction.response.is_done():
-            await interaction.followup.send(f'<:verify:1409269721794089011> Your ticket has been created: {ticket_channel.mention}', ephemeral=True)
+            await interaction.followup.send(f'Your ticket has been created: {ticket_channel.mention}', ephemeral=True)
         else:
-            await interaction.response.send_message(f'<:verify:1409269721794089011> Your ticket has been created: {ticket_channel.mention}', ephemeral=True)
+            await interaction.response.send_message(f'Your ticket has been created: {ticket_channel.mention}', ephemeral=True)
 
         view = ui.View(timeout=None)
         close_button = CloseTicketButton(self.ticket_owner, self.opening_time)
@@ -198,26 +297,61 @@ class Assistance(ui.Modal, title="🚨 | Ticket Assistance (Part: Modal)"):
 # ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
 class CloseTicketButtonModal(ui.Modal, title="🧩 | Close Ticket"):
+    """
+    A DISCORD MODAL DIALOG FOR COLLECTING THE REASON FOR CLOSING A TICKET.
+    
+    THIS MODAL IS SHOWN WHEN AN AUTHORIZED USER CLICKS THE CLOSETICKETBUTTON IN A TICKET CHANNEL.
+    IT ASKS FOR THE REASON FOR CLOSURE, THEN UPDATES THE TICKET STATUS IN THE DATABASE, GENERATES A TRANSCRIPT (INCLUDING ATTACHMENTS),
+    SENDS THE TRANSCRIPT TO A LOG CHANNEL AND THE TICKET OWNER, AND FINALLY DELETES THE TICKET CHANNEL AFTER A SHORT DELAY.
+    HANDLES VARIOUS ERROR CASES, SUCH AS MISSING PERMISSIONS OR DM FAILURES.
+    
+    ATTRIBUTES:
+        TICKET_OWNER: THE USER WHO OPENED THE TICKET.
+        OPENING_TIME: THE TIMESTAMP WHEN THE TICKET WAS OPENED.
+    
+    USAGE:
+        INSTANTIATED AND SHOWN TO THE USER WHEN THEY ATTEMPT TO CLOSE A TICKET VIA THE CLOSETICKETBUTTON.
+    """
     def __init__(self, ticket_owner, opening_time):
+        """
+        INITIALIZES THE CLOSETICKETBUTTONMODAL WITH A REQUIRED TEXT FIELD FOR THE CLOSURE REASON.
+        
+        ARGS:
+            TICKET_OWNER: THE USER WHO OPENED THE TICKET.
+            OPENING_TIME: THE DATETIME STRING WHEN THE TICKET WAS OPENED.
+        """
         super().__init__(timeout=None)
         self.ticket_owner = ticket_owner
         self.opening_time = opening_time
         self.add_item(ui.TextInput(label="Reason for closing ticket", placeholder="Enter the reason for closing the ticket, e.g.: Ticket Resolved...", style=discord.TextStyle.paragraph, required=True))
     
     async def on_submit(self, interaction: discord.Interaction):
+        """
+        HANDLES THE EVENT WHEN THE USER SUBMITS THE CLOSE TICKET MODAL.
+        
+        CHECKS IF THE USER HAS THE REQUIRED ROLE TO CLOSE TICKETS. IF AUTHORIZED, UPDATES THE TICKET STATUS IN THE DATABASE,
+        GENERATES A TRANSCRIPT (INCLUDING ALL MESSAGES AND ATTACHMENTS), SENDS THE TRANSCRIPT TO A LOG CHANNEL AND THE TICKET OWNER VIA DM,
+        AND DELETES THE TICKET CHANNEL AFTER A SHORT DELAY. HANDLES ERRORS SUCH AS MISSING PERMISSIONS OR DM FAILURES GRACEFULLY.
+        
+        ARGS:
+            INTERACTION: THE DISCORD INTERACTION OBJECT REPRESENTING THE MODAL SUBMISSION.
+        
+        SIDE EFFECTS:
+            UPDATES THE DATABASE, SENDS FILES AND MESSAGES, AND DELETES THE CHANNEL.
+        """
         conn = sqlite3.connect("data/database/ticket.db")
         c = conn.cursor()
         reason = str(self.children[0].value)
-        transcriptchannel = interaction.guild.get_channel(1410250432839815259)
-        role = interaction.guild.get_role(1409223615848906842)
+        transcriptchannel = interaction.guild.get_channel()
+        role = interaction.guild.get_role()
         
         if role not in interaction.user.roles:
-            await interaction.response.send_message(f"<:warning:1409269746477695078> {interaction.user.mention}, you do not have the required permissions to close this ticket.", ephemeral=True)
+            await interaction.response.send_message("You do not have the required permissions to close this ticket.", ephemeral=True)
             return
         
-        await interaction.response.send_message(f"<:1372211332505669633:1409270140775829726> The ticket will be closed in a few seconds... (Transcript: {transcriptchannel.mention})", ephemeral=True)
+        await interaction.response.send_message(f"The ticket will be closed in a few seconds... (Transcript: {transcriptchannel.mention})", ephemeral=True)
         ticket = interaction.channel
-        await ticket.send(f"<:1372211332505669633:1409270140775829726> The ticket was closed by {interaction.user.mention}... (This ticket will be closed in a few seconds)")
+        await ticket.send(f"The ticket was closed by {interaction.user.mention}... (This ticket will be closed in a few seconds)")
         overwrite = interaction.channel.overwrites_for(interaction.guild.default_role)
         overwrite.send_messages = False
         await interaction.channel.set_permissions(interaction.guild.default_role, overwrite=overwrite)
@@ -273,6 +407,20 @@ class CloseTicketButtonModal(ui.Modal, title="🧩 | Close Ticket"):
     DO NOT TOUCH ANYTHING
     """
     async def modify_transcript_with_attachments(self, channel, transcript):
+        """
+        MODIFIES THE HTML TRANSCRIPT TO INCLUDE ALL ATTACHMENTS (IMAGES, VIDEOS, FILES) AS BASE64-ENCODED DATA.
+        
+        ITERATES THROUGH ALL MESSAGES IN THE CHANNEL, FINDS ATTACHMENTS, AND EMBEDS THEM DIRECTLY INTO THE TRANSCRIPT HTML.
+        THIS ENSURES THAT THE TRANSCRIPT IS SELF-CONTAINED AND CAN BE VIEWED OFFLINE WITH ALL MEDIA INCLUDED.
+        HANDLES ERRORS FOR UNSUPPORTED OR PROBLEMATIC ATTACHMENTS GRACEFULLY.
+        
+        ARGS:
+            CHANNEL: THE DISCORD CHANNEL OBJECT FOR THE TICKET.
+            TRANSCRIPT: THE HTML TRANSCRIPT STRING GENERATED BY CHAT_EXPORTER.
+        
+        RETURNS:
+            STR: THE MODIFIED HTML TRANSCRIPT WITH EMBEDDED ATTACHMENTS.
+        """
         soup = BeautifulSoup(transcript, 'html.parser')
         
         async for message in channel.history(limit=None, oldest_first=True):
