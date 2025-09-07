@@ -108,7 +108,7 @@ Please review and adapt the code for your own server's needs.
 
 ## Credits
 
-Developed by importsyss and contributors.  
+Developed by importsyss.
 Uses [discord.py](https://github.com/Rapptz/discord.py) and other open-source libraries.
 
 ---
