@@ -68,15 +68,22 @@ Designed for Discord communities that need a robust ticketing/helpdesk system wi
      ```
    - Edit `src/config.py` to set your bot's name and avatar URL if desired.
 
-3. **Set up your database:**
-   - The bot will automatically create and manage the SQLite database at `data/database/ticket.db`.
-
-4. **Run the bot:**
+3. **Run the bot:**
    ```bash
    python src/main.py
    ```
 
+4. **First Run:**
+   - The bot will automatically create all required folders, the SQLite database (`data/database/ticket.db`), and the `logs/` directory if they do not exist. No manual setup is needed for the database or logs.
+
 5. **Invite the bot** to your server with the necessary permissions (manage channels, manage roles, read/send messages, etc.).
+
+---
+
+## Notes
+
+- **No manual database or log setup is required.** The bot will create everything it needs on first run.
+- **Do not commit your `.env` file or real database to version control.** See `.gitignore` for recommended exclusions.
 
 ---
 
@@ -93,9 +100,9 @@ Designed for Discord communities that need a robust ticketing/helpdesk system wi
 - `src/main.py` — Main bot logic, event handlers, and command registration.
 - `src/classes.py` — All UI components, modals, and ticket management classes.
 - `src/config.py` — Configuration and environment variable loading.
-- `data/database/` — SQLite database for ticket tracking.
-- `logs/` — Log files for bot activity.
-- `other/README.md` — This file.
+- `data/database/` — SQLite database for ticket tracking (auto-created).
+- `logs/` — Log files for bot activity (auto-created).
+- `README.md` — This file.
 
 ---
 
