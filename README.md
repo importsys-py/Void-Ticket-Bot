@@ -1,9 +1,3 @@
-[2 tools called]
-
-Here is a detailed English README for your Ticket-Bot project, based on the code and structure:
-
----
-
 # Ticket-Bot
 
 A powerful, customizable Discord bot for handling support tickets using buttons, modals, and private channels.  
