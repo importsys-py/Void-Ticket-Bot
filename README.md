@@ -110,7 +110,3 @@ Please review and adapt the code for your own server's needs.
 
 Developed by importsyss.
 Uses [discord.py](https://github.com/Rapptz/discord.py) and other open-source libraries.
-
----
-
-If you need a ready-to-paste version for your `README.md`, let me know!
